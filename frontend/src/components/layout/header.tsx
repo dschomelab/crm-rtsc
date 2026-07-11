@@ -1,4 +1,4 @@
-import { LogOut } from 'lucide-react';
+import { LogOut, User } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/ui/avatar';
@@ -31,6 +31,11 @@ export function Header() {
             <div className="px-2 py-1.5 text-sm text-muted-foreground">
               {user?.email}
             </div>
+            <DropdownMenu.Separator />
+            <DropdownMenu.Item onClick={() => navigate({ to: '/profile' })}>
+              <User className="mr-2 h-4 w-4" />
+              Perfil
+            </DropdownMenu.Item>
             <DropdownMenu.Separator />
             <DropdownMenu.Item onClick={() => logout().then(() => navigate({ to: '/login' })).catch(() => navigate({ to: '/login' }))}>
               <LogOut className="mr-2 h-4 w-4" />

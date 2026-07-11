@@ -46,7 +46,7 @@ export class AuthService {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
       });
 
-      const user = await this.usersService.findById(payload.sub);
+      const user = await this.usersService.findByIdWithAuth(payload.sub);
       if (!user || !user.refreshToken) {
         throw new UnauthorizedException('Invalid refresh token');
       }

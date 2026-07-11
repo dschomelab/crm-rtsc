@@ -22,6 +22,7 @@ import { CommissionsPage } from '@/pages/commissions';
 import { AiSuggestionsPage } from '@/pages/ai-suggestions';
 import { CompaniesPage } from '@/pages/companies';
 import { ContactsPage } from '@/pages/contacts';
+import { ProfilePage } from '@/pages/profile';
 import { EquipmentPage } from '@/pages/equipment';
 import { AdminPage } from '@/pages/admin';
 import { AdminUsersPage } from '@/pages/admin/users';
@@ -152,6 +153,12 @@ const equipmentRoute = createRoute({
   component: EquipmentPage,
 });
 
+const profileRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/profile',
+  component: ProfilePage,
+});
+
 const adminRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/admin',
@@ -212,6 +219,7 @@ const routeTree = rootRoute.addChildren([
       companiesRoute,
       contactsRoute,
       equipmentRoute,
+      profileRoute,
       adminRoute,
       adminUsersRoute,
       adminProfilesRoute,
