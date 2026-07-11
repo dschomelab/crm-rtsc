@@ -1,0 +1,18 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "cline": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "ClinePass",
+      "options": {
+        "baseURL": "https://api.cline.bot/api/v1",
+        "apiKey": "{env:sk_7b0d5c74f1e6b46429a6ac3f9f9d9d554747d1779ee6ecdc6647f98da7b0c797}"
+      },
+      "models": {
+        "deepseek-v4-flash": {},
+        "deepseek-v4-pro": {},
+        "mimo-v2.5-pro": {}
+      }
+    }
+  }
+}

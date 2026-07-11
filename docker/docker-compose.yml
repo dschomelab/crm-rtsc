@@ -1,0 +1,71 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: crm-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: crm_user
+      POSTGRES_PASSWORD: crm_password
+      POSTGRES_DB: crm_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - crm-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crm_user -d crm_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: crm-backend
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://crm_user:crm_password@postgres:5432/crm_db?schema=public
+      JWT_SECRET: your-jwt-secret-key
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_SECRET: your-jwt-refresh-secret-key
+      JWT_REFRESH_EXPIRES_IN: 7d
+      API_PREFIX: api/v1
+      CORS_ORIGINS: http://localhost:80
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - uploads_data:/app/uploads
+    networks:
+      - crm-network
+    command: >
+      sh -c "npx prisma db push && npx prisma db seed && node dist/src/main"
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api/v1
+    container_name: crm-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - crm-network
+
+volumes:
+  postgres_data:
+  uploads_data:
+
+networks:
+  crm-network:
+    driver: bridge

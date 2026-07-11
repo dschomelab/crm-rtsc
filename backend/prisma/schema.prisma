@@ -1,0 +1,695 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  SELLER
+  MANAGER
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  PROPOSAL
+  CLOSED_WON
+  CLOSED_LOST
+}
+
+enum PipelineStageType {
+  INITIAL
+  QUALIFICATION
+  PROPOSAL
+  NEGOTIATION
+  CLOSED_WON
+  CLOSED_LOST
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  password     String
+  name         String
+  role         UserRole   @default(SELLER)
+  isActive     Boolean    @default(true)
+  refreshToken String?
+  avatarUrl    String?
+  phone        String?
+
+  companyId     String    @default("default")
+  company       Company   @relation(fields: [companyId], references: [id])
+
+  teamId        String?
+  team          Team?     @relation("teamMembers", fields: [teamId], references: [id])
+  managedTeams  Team[]    @relation("managedTeams")
+  profileId     String?
+  profile       AccessProfile? @relation(fields: [profileId], references: [id])
+
+  leads        Lead[]
+  customers    Customer[]
+  activities   Activity[]
+  observations Observation[]
+  approvedProposals Proposal[] @relation("approvedProposals")
+  createdProposals  Proposal[] @relation("createdProposals")
+  serviceOrders     ServiceOrder[]
+  communications   Communication[]
+  commissions      Commission[]
+  aiSuggestions    AiSuggestion[]
+  createdCampaigns Campaign[]     @relation("createdCampaigns")
+  auditLogs     AuditLog[]
+  notifications Notification[]
+
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([companyId])
+}
+
+model Lead {
+  id          String       @id @default(cuid())
+  name        String
+  email       String?
+  phone       String?
+  source      String?
+  status      LeadStatus   @default(NEW)
+  notes       String?
+  value       Decimal      @default(0)
+
+  pipelineId  String?
+  stageId     String?
+  pipeline    Pipeline?    @relation(fields: [pipelineId], references: [id])
+  stage       PipelineStage? @relation(fields: [stageId], references: [id])
+
+  assignedTo  String?
+  assignedBy  User?        @relation(fields: [assignedTo], references: [id])
+  customerId  String?
+  customer    Customer?    @relation(fields: [customerId], references: [id])
+
+  companyId   String       @default("default")
+  company     Company      @relation(fields: [companyId], references: [id])
+
+  activities  Activity[]
+  tags        LeadTag[]
+  observations Observation[]
+  attachments Attachment[]
+  serviceOrders ServiceOrder[]
+  communications Communication[]
+  aiSuggestions  AiSuggestion[]
+  proposals   Proposal[]
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([companyId])
+  @@index([status])
+  @@index([assignedTo])
+  @@index([pipelineId])
+  @@index([stageId])
+  @@index([pipelineId, stageId])
+}
+
+model Customer {
+  id             String     @id @default(cuid())
+  name           String
+  email          String?
+  phone          String?
+  document       String?    @unique
+  documentType   String?    @default("PF")
+  companyName    String?
+  address        String?
+  number         String?
+  complement     String?
+  city           String?
+  state          String?
+  zipCode        String?
+  notes          String?
+  avatarUrl      String?
+
+  responsible    String
+  responsibleUser User?    @relation(fields: [responsible], references: [id])
+
+  companyId      String    @default("default")
+  company        Company   @relation(fields: [companyId], references: [id])
+
+  leads          Lead[]
+  proposals      Proposal[]
+  activities     Activity[]
+  solarConsumptions SolarConsumption[]
+  solarSimulations  SolarSimulation[]
+  serviceOrders     ServiceOrder[]
+  communications    Communication[]
+  aiSuggestions     AiSuggestion[]
+  contacts          Contact[]
+
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@index([companyId])
+  @@index([responsible])
+}
+
+model Pipeline {
+  id          String           @id @default(cuid())
+  name        String
+  description String?
+
+  companyId    String          @default("default")
+  company      Company         @relation(fields: [companyId], references: [id])
+
+  stages      PipelineStage[]
+  leads       Lead[]
+
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([companyId])
+}
+
+model PipelineStage {
+  id          String           @id @default(cuid())
+  name        String
+  description String?
+  order       Int
+  type        PipelineStageType @default(QUALIFICATION)
+  probability Int              @default(0)
+
+  pipelineId  String
+  pipeline    Pipeline         @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+
+  leads       Lead[]
+  proposals   Proposal[]
+
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([pipelineId])
+  @@index([order])
+}
+
+model Proposal {
+  id            String     @id @default(cuid())
+  title         String
+  description   String?
+  value         Decimal    @default(0)
+  status        String     @default("DRAFT")
+  validUntil    DateTime?
+  terms         String?
+  discount      Decimal    @default(0)
+  shipping      Decimal    @default(0)
+  notes         String?
+  version       Int        @default(1)
+  createdBy     String?
+  createdByUser User?      @relation("createdProposals", fields: [createdBy], references: [id])
+
+  customerId    String
+  customer      Customer   @relation(fields: [customerId], references: [id])
+
+  leadId        String?
+  lead          Lead?      @relation(fields: [leadId], references: [id])
+
+  stageId       String?
+  stage         PipelineStage? @relation(fields: [stageId], references: [id])
+
+  approvedBy    String?
+  approvedByUser User?    @relation("approvedProposals", fields: [approvedBy], references: [id])
+  approvedAt    DateTime?
+  rejectedReason String?
+
+  companyId     String     @default("default")
+  company       Company    @relation(fields: [companyId], references: [id])
+
+  items         ProposalItem[]
+  activities    Activity[]
+  solarSimulation SolarSimulation?
+  commissions   Commission[]
+  costs         Cost[]
+
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([companyId])
+  @@index([customerId])
+  @@index([stageId])
+  @@index([leadId])
+}
+
+model ProposalItem {
+  id          String    @id @default(cuid())
+  proposalId  String
+  proposal    Proposal  @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Int       @default(1)
+  unitPrice   Decimal   @default(0)
+  total       Decimal   @default(0)
+
+  createdAt   DateTime  @default(now())
+
+  @@index([proposalId])
+}
+
+model Activity {
+  id          String    @id @default(cuid())
+  type        String
+  description String?
+  dueDate     DateTime?
+  completedAt DateTime?
+
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+
+  leadId      String?
+  lead        Lead?     @relation(fields: [leadId], references: [id])
+
+  customerId  String?
+  customer    Customer? @relation(fields: [customerId], references: [id])
+
+  proposalId  String?
+  proposal    Proposal? @relation(fields: [proposalId], references: [id])
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([leadId])
+  @@index([customerId])
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  color     String?
+
+  leads     LeadTag[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model LeadTag {
+  leadId String
+  lead   Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  tagId  String
+  tag    Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([leadId, tagId])
+}
+
+model Observation {
+  id        String   @id @default(cuid())
+  content   String
+
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([leadId])
+}
+
+model Attachment {
+  id           String   @id @default(cuid())
+  leadId       String
+  fileName     String
+  originalName String
+  mimeType     String
+  size         Int
+  createdAt    DateTime @default(now())
+
+  lead         Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+}
+
+model SolarConsumption {
+  id              String   @id @default(cuid())
+  customerId      String
+  customer        Customer @relation(fields: [customerId], references: [id])
+  averageKwh      Float
+  monthlyKwh      Json?
+  peakSunHours    Float?
+  tariffType      String?
+  tariffValue     Float?
+  connectionType  String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([customerId])
+}
+
+model SolarSimulation {
+  id              String   @id @default(cuid())
+  customerId      String
+  customer        Customer @relation(fields: [customerId], references: [id])
+  proposalId      String?  @unique
+  proposal        Proposal? @relation(fields: [proposalId], references: [id])
+  systemPowerKw   Float
+  panelCount      Int
+  panelModel      String?
+  inverterModel   String?
+  estimatedGeneration Float
+  monthlySavings  Float
+  totalCost       Float
+  paybackYears    Float
+  co2Avoided      Float?
+  status          String   @default("DRAFT")
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([customerId])
+}
+
+model ServiceOrder {
+  id              String   @id @default(cuid())
+  title           String
+  description     String?
+  status          String   @default("PENDING")
+  priority        String   @default("NORMAL")
+  scheduledDate   DateTime?
+  completedAt     DateTime?
+  customerId      String
+  customer        Customer @relation(fields: [customerId], references: [id])
+  assignedTo      String?
+  assignedUser    User?    @relation(fields: [assignedTo], references: [id])
+  leadId          String?
+  lead            Lead?    @relation(fields: [leadId], references: [id])
+  notes           String?
+
+  companyId       String   @default("default")
+  company         Company  @relation(fields: [companyId], references: [id])
+
+  checklistItems ChecklistItem[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([customerId])
+  @@index([status])
+  @@index([assignedTo])
+}
+
+model Communication {
+  id          String   @id @default(cuid())
+  type        String
+  direction   String   @default("OUTBOUND")
+  subject     String?
+  content     String?
+  fromEmail   String?
+  toEmail     String?
+  toPhone     String?
+  status      String   @default("SENT")
+  leadId      String?
+  lead        Lead?    @relation(fields: [leadId], references: [id])
+  customerId  String?
+  customer    Customer? @relation(fields: [customerId], references: [id])
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+
+  companyId   String   @default("default")
+  company     Company  @relation(fields: [companyId], references: [id])
+
+  createdAt   DateTime @default(now())
+
+  @@index([companyId])
+  @@index([leadId])
+  @@index([customerId])
+  @@index([userId])
+}
+
+model Campaign {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  type        String   @default("ADS")
+  platform    String?
+  status      String   @default("ACTIVE")
+  budget      Float    @default(0)
+  spent       Float    @default(0)
+  leadsCount  Int      @default(0)
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  utmContent  String?
+  startDate   DateTime?
+  endDate     DateTime?
+  createdBy   String
+  createdByUser User?  @relation("createdCampaigns", fields: [createdBy], references: [id])
+
+  companyId   String   @default("default")
+  company     Company  @relation(fields: [companyId], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([status])
+}
+
+model Commission {
+  id            String   @id @default(cuid())
+  proposalId    String
+  proposal      Proposal @relation(fields: [proposalId], references: [id])
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  value         Float
+  percentage    Float
+  status        String   @default("PENDING")
+  paidAt        DateTime?
+
+  companyId     String   @default("default")
+  company       Company  @relation(fields: [companyId], references: [id])
+
+  createdAt     DateTime @default(now())
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([proposalId])
+}
+
+model AiSuggestion {
+  id          String   @id @default(cuid())
+  type        String
+  title       String
+  description String?
+  score       Float?
+  data        Json?
+  leadId      String?
+  lead        Lead?    @relation(fields: [leadId], references: [id])
+  customerId  String?
+  customer    Customer? @relation(fields: [customerId], references: [id])
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([type])
+}
+
+model Company {
+  id        String   @id @default("default")
+  name      String
+  slug      String   @unique
+  logoUrl   String?
+  address   String?
+  number    String?
+  complement String?
+  city      String?
+  state     String?
+  zipCode   String?
+  phone     String?
+  email     String?
+  website   String?
+  document  String?
+  isActive  Boolean  @default(true)
+
+  users     User[]
+  customers Customer[]
+  leads     Lead[]
+  pipelines Pipeline[]
+  proposals Proposal[]
+  serviceOrders ServiceOrder[]
+  campaigns Campaign[]
+  communications Communication[]
+  commissions Commission[]
+  equipments      Equipment[]
+  costs           Cost[]
+  teams           Team[]
+  auditLogs       AuditLog[]
+  accessProfiles  AccessProfile[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Contact {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  name       String
+  role       String?
+  phone      String?
+  email      String?
+  isMain     Boolean  @default(false)
+  notes      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([customerId])
+}
+
+model Equipment {
+  id          String   @id @default(cuid())
+  name        String
+  type        String
+  brand       String?
+  model       String?
+  power       Float?
+  price       Float    @default(0)
+  warranty    Int?
+  stock       Int      @default(0)
+  active      Boolean  @default(true)
+
+  companyId   String   @default("default")
+  company     Company  @relation(fields: [companyId], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([type])
+}
+
+model ChecklistItem {
+  id             String       @id @default(cuid())
+  serviceOrderId String
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  description    String
+  completed      Boolean      @default(false)
+  completedAt    DateTime?
+  completedBy    String?
+  order          Int          @default(0)
+
+  createdAt      DateTime     @default(now())
+
+  @@index([serviceOrderId])
+}
+
+model Cost {
+  id         String   @id @default(cuid())
+  proposalId String
+  proposal   Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  type       String
+  description String
+  value      Float
+  date       DateTime?
+
+  companyId  String   @default("default")
+  company    Company  @relation(fields: [companyId], references: [id])
+
+  createdAt  DateTime @default(now())
+
+  @@index([proposalId])
+  @@index([companyId])
+}
+
+model Team {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  managerId   String?
+  manager     User?    @relation("managedTeams", fields: [managerId], references: [id])
+  managerName String?
+
+  companyId   String   @default("default")
+  company     Company  @relation(fields: [companyId], references: [id])
+
+  members     User[]   @relation("teamMembers")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  action     String
+  entity     String
+  entityId   String?
+  description String?
+  metadata   Json?
+
+  companyId  String   @default("default")
+  company    Company  @relation(fields: [companyId], references: [id])
+
+  createdAt  DateTime @default(now())
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([entity])
+  @@index([action])
+}
+
+model AccessProfile {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  permissions Json?
+
+  companyId   String   @default("default")
+  company     Company  @relation(fields: [companyId], references: [id])
+
+  users       User[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId])
+}
+
+model CompanySettings {
+  id        String   @id @default("default")
+  name      String
+  logoUrl   String?
+  address   String?
+  number    String?
+  complement String?
+  city      String?
+  state     String?
+  zipCode   String?
+  phone     String?
+  email     String?
+  website   String?
+  document  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  message   String?
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, readAt])
+}
