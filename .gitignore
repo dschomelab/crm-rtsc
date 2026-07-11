@@ -6,3 +6,4 @@ dist/
 coverage/
 .next/
 .husky/_/
+token.json
